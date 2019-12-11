@@ -1,6 +1,12 @@
 import React from 'react'
 import ReactDOM from 'react-dom'
 
-const App = <h1>Yolk test</h1>
+const App = (
+  <div>
+    <h1>Yolkjs</h1>
+    <p>react dom</p>
+    <a href="https://jd.com">shop</a>
+  </div>
+)
 
 ReactDOM.render(App, document.getElementById('root'))
