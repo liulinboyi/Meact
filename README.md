@@ -1,71 +1,112 @@
 # yolkjs
-a demo for learning react 
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+一个学习 React 源码的例子
 
-## Available Scripts
+### 学习目标
+> 1. JSX
+> 2. createElement
+> 3. Render
+> 4. fiber
+> 5. functional component
+> 6. hooks
 
-In the project directory, you can run:
 
-### `yarn start`
+### 初始环境
 
-Runs the app in the development mode.<br />
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+通过 [Create React App](https://github.com/facebook/create-react-app) 创建初始的 `React` 项目
 
-The page will reload if you make edits.<br />
-You will also see any lint errors in the console.
+然后在浏览器打开 [http://localhost:3000](http://localhost:3000) 查看
 
-### `yarn test`
+### JSX 
 
-Launches the test runner in the interactive watch mode.<br />
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+JSX 写起来像 html， 其实是 babel 转义成 `React.crxeateElement` 来执行的，用来构建虚拟 dom,
 
-### `yarn build`
+```js
+<h1 title="app">Yolk test</h1>
+```
 
-Builds the app for production to the `build` folder.<br />
-It correctly bundles React in production mode and optimizes the build for the best performance.
+解析成：
+```js
+React.createElement(
+  "h1",
+  { title: "app"},
+  "Yolk test"
+)
+```
 
-The build is minified and the filenames include the hashes.<br />
-Your app is ready to be deployed!
+这也是为什么用了 JSX 的文件，必须要 `import React from 'react'` 的原因所在
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+我们知道通过 createElement 构建虚拟 dom 这种形式是组件化的最佳实践，那为什么要用 JSX 呢？这就需要从虚拟 dom 的概念说起，简单来说，虚拟 dom 就是用 JS 对象来描述真实的 dom。
 
-### `yarn eject`
+```js
+const element = {
+  type: "h1",
+  props: {
+    title: "app",
+    children: "Yolk, test",
+  }
+}
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+我们用 JS 对象，来完整地描述 dom， 后续有任何的修改需求，只需要频繁的操作这个 dom，尽可能少的操作真实 dom， 这也就是为什么虚拟 dom 性能良好的原因所在： 在两次操作之间进行 diff，只做最少的修改次数。
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### createElement
 
-Instead, it will copy all the configuration files and the transitive dependencies (Webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+我们通过改写 `index.js` 文件，实现一个原始的 JSX 项目：
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+```js
+// index.js
+import React from 'react'
+import ReactDOM from 'react-dom'
 
-## Learn More
+const App = (
+  <div>
+    <h1>Yolkjs</h1>
+    <p>react dom</p>
+    <a href="https://jd.com">shop</a>
+  </div>
+)
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+ReactDOM.render(App, document.getElementById('root'))
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```
 
-### Code Splitting
+由于可以预知我们需要要构建虚拟 dom，上述 JSX 应该会解析成这样：
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/code-splitting
+```js
+React.createElement(
+  "div",
+  {id: "app"},
+  React.createElement(
+    "h1",
+    null,
+    "Yolkjs"
+  ),
+  React.createElement(
+    "p",
+    null,
+    "react dom"
+  ),
+  React.createElement(
+    "a",
+    { href: "https://jd.com"},
+    "shop"
+  )
+)
+```
 
-### Analyzing the Bundle Size
+然后期待返回的对象如下：
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size
-
-### Making a Progressive Web App
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app
-
-### Advanced Configuration
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/advanced-configuration
-
-### Deployment
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/deployment
-
-### `yarn build` fails to minify
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify
+```js
+const element = {
+  type: "div",
+  props: {
+    id: "app",
+    children: [
+      { type: "h1", props: { value: "Yolkjs"}},
+      { type: "p", props: { value: "react dom"}},
+      { type: "a", props: { href: "https://jd.com", value: "shop"}},
+    ]
+  }
+}
+```
