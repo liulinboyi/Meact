@@ -95,7 +95,7 @@ React.createElement(
 )
 ```
 
-然后期待返回的对象如下：
+期待返回的对象如下：
 
 ```js
 const element = {
@@ -110,3 +110,50 @@ const element = {
   }
 }
 ```
+
+所以我们 `yolkjs` 的源码中的 `createElement()` 方法也可以想到该如何实现了, 其实就是在 `createElement` 的时候创建一个合适的 *JSON* 结构数据。让我们先在 `src` 目录下创建一个 `yolkjs` 文件夹，然后再创建一个 `index.js` 文件，实现我们的源码
+
+```js
+// /src/yolkjs/index.js
+function createElement(type, props, ...children) {
+  // 删除掉开发调试的 source，避免干扰
+  delete props.__source
+  return {
+    type,
+    props: {
+      ...props,
+      children,
+    }
+  }
+}
+
+function render(vdom, container) {
+  // 我们先在页面上渲染处 dom 的 json 结构
+  container.innerHTML = `<pre>${JSON.stringify(vdom, null, 2)}</pre>`
+}
+
+export default {
+  createElement,
+  render,
+}
+
+```
+
+最后我们再改造下 `/src/index.js` 的代码:
+
+```js
+// /src/index.js
+// import React from 'react'
+// import ReactDOM from 'react-dom'
+
+import React from './yolkjs'
+const ReactDOM = React
+
+// ...
+```
+
+运行 `yarn start`，然后访问 [http://localhost:3000](http://localhost:3000) 应该可以得到如下界面:
+
+![初始版 yolkjs json](/static/json.jpg)
+
+这个 json 基本符合我们一开始的预期效果
