@@ -156,4 +156,63 @@ const ReactDOM = React
 
 ![初始版 yolkjs json](/static/json.jpg)
 
-这个 json 基本符合我们一开始的预期效果
+这个 json 基本符合我们一开始的预期效果，不过为了方便后面操作 dom 我们需要简单改造一下，把 `children` 中的文本也改造成一个节点，所以我们需要实现一个 `createTextElement()` 的方法，并且遍历 children 的属性根据类型来判断是否返回文本节点：
+
+```js
+// /src/yolkjs/index.js
+
+function createElement(type, props, ...children) {
+  delete props.__source
+  return {
+    type,
+    props: {
+      ...props,
+      children: children.map(child =>
+        typeof child === 'object' ? child : createTextElement(child)
+      )
+    }
+  }
+}
+
+function createTextElement(text) {
+  return {
+    type: 'TEXT',
+    props: {
+      nodeValue: text,
+      children: [],
+    }
+  }
+}
+
+// ...
+```
+
+再访问下 [http://localhost:3000](http://localhost:3000) 应该可以得到结果：
+
+![初始版 yolkjs 修正文本节点](/static/json1.jpg)
+
+### render
+
+现在的 `render()` 只是简单地渲染一个虚拟对象结构，我们需要转换成真实的 dom 渲染，这一步其实没啥特别的，就是挨个遍历，创建dom，然后添加到父视图中。
+
+```js
+// /src/yolkjs/index.js
+// ...
+function render(vdom, container) {
+  // container.innerHTML = `<pre>${JSON.stringify(vdom, null, 2)}</pre>`
+  const dom = vdom.type === "TEXT" ? document.createTextNode("") : document.createElement(vdom.type)
+
+  // 设置属性
+  Object.keys(vdom.props).forEach(name => {
+    if (name !== 'children') {
+      dom[name] = vdom.props[name]
+    }
+  })
+
+  // 递归渲染的子元素
+  vdom.props.children.forEach(child => render(child, dom))
+
+  container.appendChild(dom)
+}
+// ...
+```
