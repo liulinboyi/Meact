@@ -205,6 +205,7 @@ function render(vdom, container) {
   // 设置属性
   Object.keys(vdom.props).forEach(name => {
     if (name !== 'children') {
+      // @todo: 属性判断，事件处理
       dom[name] = vdom.props[name]
     }
   })
@@ -264,9 +265,112 @@ requestIdleCallback(workLoop)
 
 ![fiber tree](/static/fiberTree.png)
 
-整个任务从 render 开始， 每次只遍历一个小单元，一旦被打断，就去执行优先级高的任务(用户交互，动画)，回来后，由于回来的元素知道父，子，兄弟元素，很容易恢复遍历的状态
+整个任务从 render 开始， 每次只遍历一个小单元，一旦被打断，就去执行优先级高的任务(用户交互，动画)，回来后，由于回来的元素知道父，子，兄弟元素，很容易恢复遍历的状态。
+
+首先我们需要把创建 dom 的函数提取出来，新建一个 `createDom()` 方法 
 
 ```js
 // /src/yolkjs/index.js
+/**
+ *  通过虚拟 dom 新建 dom
+ * @param {*} vdom 
+ */
 
+// ...
+function createDom(vdom) {
+  // 创建 dom
+  const dom = vdom.type === "TEXT"
+    ? document.createTextNode("")
+    : document.createElement(vdom.type)
+  // 设置属性
+  Object.keys(vdom.props).forEach(name => {
+    if (name !== 'children') {
+      // @todo: 属性判断，事件处理
+      dom[name] = vdom.props[name]
+    }
+  })
+  return dom
+}
+
+function render(vdom, container) {
+
+  nextUnitOfWork = {
+    dom: container,
+    props: {
+      children: [vdom]
+    }
+  }
+  // container.innerHTML = `<pre>${JSON.stringify(vdom, null, 2)}</pre>`
+  // 递归渲染的子元素
+  // vdom.props.children.forEach(child => render(child, dom))
+
+  // container.appendChild(dom)
+}
+
+// 下一个单元任务
+// render 函数会初始化第一个任务
+let nextUnitOfWork = null
+
+//  调度我们的 diff 或者渲染任务
+function workLoop(deadline) {
+  // 有下一个任务，且当前帧还没有结束
+  while (nextUnitOfWork && deadline.timeRemaining() > 1) {
+    // 
+    nextUnitOfWork = performUnitOfWork(nextUnitOfWork)
+  }
+  requestIdleCallback(workLoop)
+}
+
+function performUnitOfWork(fiber) {
+  // 获取下一个任务
+  // 根据当前任务获取下一个任务
+  if (!fiber.dom) {
+    // 不是入口
+    fiber.dom = createDom(fiber)
+  }
+
+  if (fiber.parent) {
+    fiber.parent.dom.appendChild(fiber.dom)
+  }
+
+  const elements = fiber.props.children
+  // 构建成 fiber
+  let index = 0
+  let preSlibing = null
+  while (index < elements.length) {
+    let element = elements[index]
+    const newFiber = {
+      type: element.type,
+      props: element.props,
+      parent: fiber,
+      dom: null,
+    }
+
+    if (index === 0) {
+      //  第一个元素，是父fiber 的child 属性
+      fiber.child = newFiber
+    } else {
+      // 其他元素是兄弟元素
+      preSlibing.slibing = newFiber
+    }
+    preSlibing = fiber
+    index++
+    // fiber 基本结构构建完毕
+  }
+  // 找下一个任务
+  if (fiber.child) {
+    return fiber.child
+  }
+  let nextFiber = fiber
+  // 没有子元素，就找兄弟元素
+  while (nextFiber) {
+    if (nextFiber.slibing) {
+      return nextFiber.slibing
+    }
+    //  没有兄弟元素了，找父元素
+    nextFiber = nextFiber.parent
+  }
+
+}
+// ...
 ```
