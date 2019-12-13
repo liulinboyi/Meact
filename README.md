@@ -216,3 +216,57 @@ function render(vdom, container) {
 }
 // ...
 ```
+
+### concurrent
+
+细心的同学已经发现，上面的 `render()` 函数，一旦开始就会不断地递归，无法停止，本身在这里是没啥问题，但是如果应用变大以后就会有卡顿。后面状态修改后的 diff 过程也是一样的道理，整个 vdom 变大以后，diff 的过程也会递归过多而导致卡顿。
+
+那如何解决这个问题呢？
+
+浏览器提供了一个 api `reauestIdleCallback` 可以利用浏览器的业余时间，我们可以把任务拆解成一个一个的小任务，然后利用浏览器空闲的时间来做 diff， 如果当前任务来了，比如用户的点击或者动画，就会先执行，等待空闲后再回去把 `requestIdleCallback` 没完成的任务完成
+
+```js
+// /src/yolkjs/index.js
+// ...
+function render(vdom, container) {
+  //... 
+}
+
+// 下一个单元任务
+// render 函数会初始化第一个任务
+let nextUnitOfWork = null
+
+//  调度我们的 diff 或者渲染任务
+function workLoop(deadline) {
+  // 有下一个任务，且当前帧还没有结束
+  while (nextUnitOfWork && deadline.timeRemaining() > 1) {
+    // 
+    nextUnitOfWork = performUnitOfWork(nextUnitOfWork)
+  }
+  requestIdleCallback(workLoop)
+}
+
+function performUnitOfWork(fiber) {
+  // 获取下一个任务
+  // 根据当前任务获取下一个任务
+}
+
+//  启动空闲时间渲染
+requestIdleCallback(workLoop)
+// ...
+```
+
+> PS: react 已经重写了 requestIdleCallback, 不用系统的，但是整个过程是一致的。
+
+### fibers
+
+我们有了调度逻辑，之前的 vdom 结构是一个树形结构，diff 过程是没法中断的，为了我们 vdom 树之间的关系，我们需要把树形结构的内部关系改造成链表(方便中止)，之前 children 作为一个数组递归遍历，现在 父 => 子， 子 => 父， 子 => 兄弟， 都有关系。
+
+![fiber tree](/static/fiberTree.png)
+
+整个任务从 render 开始， 每次只遍历一个小单元，一旦被打断，就去执行优先级高的任务(用户交互，动画)，回来后，由于回来的元素知道父，子，兄弟元素，很容易恢复遍历的状态
+
+```js
+// /src/yolkjs/index.js
+
+```
