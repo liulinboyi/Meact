@@ -35,6 +35,7 @@ function render(vdom, container) {
   // 设置属性
   Object.keys(vdom.props).forEach(name => {
     if (name !== 'children') {
+      // @todo: 属性判断，事件处理
       dom[name] = vdom.props[name]
     }
   })
@@ -44,6 +45,28 @@ function render(vdom, container) {
 
   container.appendChild(dom)
 }
+
+// 下一个单元任务
+// render 函数会初始化第一个任务
+let nextUnitOfWork = null
+
+//  调度我们的 diff 或者渲染任务
+function workLoop(deadline) {
+  // 有下一个任务，且当前帧还没有结束
+  while (nextUnitOfWork && deadline.timeRemaining() > 1) {
+    // 
+    nextUnitOfWork = performUnitOfWork(nextUnitOfWork)
+  }
+  requestIdleCallback(workLoop)
+}
+
+function performUnitOfWork(fiber) {
+  // 获取下一个任务
+  // 根据当前任务获取下一个任务
+}
+
+//  启动空闲时间渲染
+requestIdleCallback(workLoop)
 
 export default {
   createElement,
