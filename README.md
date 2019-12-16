@@ -336,7 +336,7 @@ function performUnitOfWork(fiber) {
   const elements = fiber.props.children
   // 构建成 fiber
   let index = 0
-  let preSlibing = null
+  let preSibling = null
   while (index < elements.length) {
     let element = elements[index]
     const newFiber = {
@@ -350,9 +350,9 @@ function performUnitOfWork(fiber) {
       fiber.child = newFiber
     } else {
       // 其他元素是兄弟元素
-      preSlibing.slibing = newFiber
+      preSibling.sibling = newFiber
     }
-    preSlibing = fiber
+    preSibling = fiber
     index++
     // fiber 基本结构构建完毕
   }
@@ -366,8 +366,8 @@ function performUnitOfWork(fiber) {
   let nextFiber = fiber
   // 没有子元素，就找兄弟元素
   while (nextFiber) {
-    if (nextFiber.slibing) {
-      return nextFiber.slibing
+    if (nextFiber.sibling) {
+      return nextFiber.sibling
     }
     // 没有兄弟元素，找父元素
     nextFiber = nextFiber.parent
@@ -413,7 +413,7 @@ function commitWorker(fiber) {
   const domParent = fiber.parent.dom
   domParent.appendChild(fiber.dom)
   commitWorker(fiber.child)
-  commitWorker(fiber.slibing)
+  commitWorker(fiber.sibling)
 }
 
 // 下一个单元任务
@@ -448,8 +448,9 @@ function performUnitOfWork(fiber) {
   // if (fiber.parent) {
   //   fiber.parent.dom.appendChild(fiber.dom)
   // }
-  
   // ...
 }
 // ...
 ```
+
+### Recon
