@@ -28,22 +28,36 @@ function createTextElement(text) {
   }
 }
 
-function render(vdom, container) {
-  // container.innerHTML = `<pre>${JSON.stringify(vdom, null, 2)}</pre>`
-  const dom = vdom.type === "TEXT" ? document.createTextNode("") : document.createElement(vdom.type)
-
-  // 设置属性
+/**
+ * 通过虚拟 dom 新建 dom 元素
+ * @param {*} vdom 虚拟 dom
+ */
+function createDom(vdom) {
+  const dom = vdom.type === "TEXT"
+    ? document.createTextNode("")
+    : document.createElement(vdom.type)
   Object.keys(vdom.props).forEach(name => {
-    if (name !== 'children') {
+    if (name !== "children") {
       // @todo: 属性判断，事件处理
       dom[name] = vdom.props[name]
     }
   })
+  return dom
+}
 
+function render(vdom, container) {
+
+  nextUnitOfWork = {
+    dom: container,
+    props: {
+      children: [vdom],
+    }
+  }
+  // container.innerHTML = `<pre>${JSON.stringify(vdom, null, 2)}</pre>`
   // 递归渲染的子元素
-  vdom.props.children.forEach(child => render(child, dom))
+  // vdom.props.children.forEach(child => render(child, dom))
 
-  container.appendChild(dom)
+  // container.appendChild(dom)
 }
 
 // 下一个单元任务
@@ -63,6 +77,54 @@ function workLoop(deadline) {
 function performUnitOfWork(fiber) {
   // 获取下一个任务
   // 根据当前任务获取下一个任务
+
+  if (!fiber.dom) {
+    // 不是入口
+    fiber.dom = createDom(fiber)
+  }
+
+  if (fiber.parent) {
+    fiber.parent.dom.appendChild(fiber.dom)
+  }
+  const elements = fiber.props.children
+  // 构建成 fiber
+  let index = 0
+  let preSlibing = null
+  while (index < elements.length) {
+    let element = elements[index]
+    const newFiber = {
+      type: element.type,
+      props: element.props,
+      parent: fiber,
+      dom: null,
+    }
+    if (index === 0) {
+      // 第一个元素，是父 fiber 的 child 属性
+      fiber.child = newFiber
+    } else {
+      // 其他元素是兄弟元素
+      preSlibing.slibing = newFiber
+    }
+    preSlibing = fiber
+    index++
+    // fiber 基本结构构建完毕
+  }
+
+  // 找下一个任务
+  // 先找子元素
+  if (fiber.child) {
+    return fiber.child
+  }
+
+  let nextFiber = fiber
+  // 没有子元素，就找兄弟元素
+  while (nextFiber) {
+    if (nextFiber.slibing) {
+      return nextFiber.slibing
+    }
+    // 没有兄弟元素，找父元素
+    nextFiber = nextFiber.parent
+  }
 }
 
 //  启动空闲时间渲染
