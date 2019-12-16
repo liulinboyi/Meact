@@ -454,3 +454,180 @@ function performUnitOfWork(fiber) {
 ```
 
 ### Recon
+
+现在已经能够渲染了，但是如何更新和删除节点呢？这里我们需要保存一个被中断前工作的 fiber 节点 currentRoot
+
+```js
+// /src/yolkjs/index.js
+let currentRoot = null
+let deletions = null
+```
+
+每个 fiber 都有一个字段，存储这上一个状态的 fiber 并且针对子元素，设计一个 reconcileChildren 函数,并且我们需要对 fiber 增加一个 base 字段进行对比。同时还要根据节点类型进行比较，如果类型相同，dom 可以复用，更新节点即可，如果类型不同，就直接替换，否则就直接删除。
+
+```js
+function reconcileChildren(wipFiber, elements) {
+  // 构建成 fiber
+  let index = 0
+  let oldFiber = wipFiber.base && wipFiber.base.child
+  let preSibling = null
+  // console.log('oldFiber:', oldFiber)
+  while (index < elements.length) {
+    // while (index < elements.length) {
+    let element = elements[index]
+    let newFiber = null
+    // 对比 oldfiber 的状态和当前 element
+    // 先比较类型，
+    const sameType = oldFiber && element && oldFiber.type === element.type
+    if (sameType) {
+      // 复用节点，更新
+      newFiber = {
+        type: oldFiber.type,
+        props: element.props,
+        dom: oldFiber.dom,
+        parent: wipFiber,
+        base: oldFiber,
+        effectTag: "UPDATE",
+      }
+    }
+
+    if (!sameType && element) {
+      // 新增节点
+      newFiber = {
+        type: element.type,
+        props: element.props,
+        dom: null,
+        parent: wipFiber,
+        base: null,
+        effectTag: "PLACEMENT",
+      }
+    }
+    if (!sameType && oldFiber) {
+      // 删除
+      oldFiber.effectTag = "DELETION"
+      deletions.push(oldFiber)
+    }
+
+    if (oldFiber) {
+      oldFiber = oldFiber.sibling
+    }
+    if (index === 0) {
+      // 第一个元素，是父 fiber 的 child 属性
+      wipFiber.child = newFiber
+    } else {
+      // 其他元素是兄弟元素
+      preSibling.sibling = newFiber
+    }
+    preSibling = newFiber
+    index++
+    // fiber 基本结构构建完毕
+  }
+}
+```
+
+我们还要新增一个方法 `updateDom()` ，来完成事件的监听: 
+
+```js
+// /src/yolkjs/index.js
+// ...
+/**
+ * 通过虚拟 dom 新建 dom 元素
+ * @param {*} vdom 虚拟 dom
+ */
+function createDom(vdom) {
+  const dom = vdom.type === "TEXT"
+    ? document.createTextNode("")
+    : document.createElement(vdom.type)
+  updateDom(dom, {}, vdom.props)
+  // Object.keys(vdom.props).forEach(name => {
+  //   if (name !== "children") {
+  //     // @todo: 属性判断，事件处理
+  //     dom[name] = vdom.props[name]
+  //   }
+  // })
+  return dom
+}
+
+function updateDom(dom, preProps, nextProps) {
+  /**
+   * 1. 规避 children 属性
+   * 2. 老得存在，取消
+   * 3. 新的存在，新增， 
+   */
+
+  //  @todo 兼容性问题  
+
+  Object.keys(preProps)
+    .filter(name => name !== 'children')
+    .filter(name => !(name in nextProps))
+    .forEach(name => {
+      if (name.slice(0, 2) === 'on') {
+        // onclick => chick
+        dom.removeEventListener(name.slice(0, 2).toLowerCase(), preProps[name], false)
+      } else {
+        dom[name] = ''
+      }
+    })
+
+  Object.keys(nextProps)
+    .filter(name => name !== 'children')
+    .forEach(name => {
+      if (name.slice(0, 2) === 'on') {
+        // onclick => chick
+        dom.removeEventListener(name.slice(0, 2).toLowerCase(), preProps[name], false)
+      } else {
+        dom[name] = nextProps[name]
+      }
+    })
+}
+```
+
+最后修改下 render 和 commit 相关的一些代码，我们即可实现 fiber 的架构
+
+```js
+// /src/yolkjs/index.js
+// ...
+function render(vdom, container) {
+  wipRoot = {
+    dom: container,
+    props: {
+      children: [vdom],
+    },
+    base: currentRoot, // 分身
+  }
+  deletions = []
+  nextUnitOfWork = wipRoot
+  // container.innerHTML = `<pre>${JSON.stringify(vdom, null, 2)}</pre>`
+  // 递归渲染的子元素
+  // vdom.props.children.forEach(child => render(child, dom))
+
+  // container.appendChild(dom)
+}
+
+function commitRoot() {
+  deletions.forEach(commitWorker)
+  commitWorker(wipRoot.child)
+  currentRoot = wipRoot
+  wipRoot = null
+}
+
+function commitWorker(fiber) {
+  if (!fiber) {
+    return
+  }
+  const domParent = fiber.parent.dom
+  // domParent.appendChild(fiber.dom)
+  if (fiber.effectTag === 'PLACEMENT' && fiber.dom !== null) {
+    domParent.appendChild(fiber.dom)
+  } else if (fiber.effectTag === 'DELETION') {
+    domParent.removeChild(fiber.dom)
+  } else if (fiber.effectTag === 'UPDATE' && fiber.dom !== null) {
+    // 更新dom
+    updateDom(fiber.dom, fiber.base.props, fiber.props)
+  }
+  commitWorker(fiber.child)
+  commitWorker(fiber.sibling)
+}
+// ...
+```
+
