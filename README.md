@@ -376,3 +376,80 @@ function performUnitOfWork(fiber) {
 
 // ...
 ```
+
+### commit
+
+给 dom 添加节点的时候，如果渲染过程中被打断，ui 渲染会变得很奇怪，所以我们需要把 dom 操作独立出来。用一个全局变量来存储正在工作的根节点。
+
+```js
+// /src/yolkjs/index.js
+// ...
+function render(vdom, container) {
+
+  wipRoot = {
+    dom: container,
+    props: {
+      children: [vdom],
+    }
+  }
+
+  nextUnitOfWork = wipRoot
+  // container.innerHTML = `<pre>${JSON.stringify(vdom, null, 2)}</pre>`
+  // 递归渲染的子元素
+  // vdom.props.children.forEach(child => render(child, dom))
+
+  // container.appendChild(dom)
+}
+
+function commitRoot() {
+  commitWorker(wipRoot.child)
+  wipRoot = null
+}
+
+function commitWorker(fiber) {
+  if (!fiber) {
+    return
+  }
+  const domParent = fiber.parent.dom
+  domParent.appendChild(fiber.dom)
+  commitWorker(fiber.child)
+  commitWorker(fiber.slibing)
+}
+
+// 下一个单元任务
+// render 函数会初始化第一个任务
+let nextUnitOfWork = null
+let wipRoot = null
+
+//  调度我们的 diff 或者渲染任务
+function workLoop(deadline) {
+  // 有下一个任务，且当前帧还没有结束
+  while (nextUnitOfWork && deadline.timeRemaining() > 1) {
+    // 
+    nextUnitOfWork = performUnitOfWork(nextUnitOfWork)
+  }
+  if (!nextUnitOfWork && wipRoot) {
+    // 没有任务了，并且根节点还在
+    commitRoot()
+  }
+  requestIdleCallback(workLoop)
+}
+
+function performUnitOfWork(fiber) {
+  // 获取下一个任务
+  // 根据当前任务获取下一个任务
+
+  if (!fiber.dom) {
+    // 不是入口
+    fiber.dom = createDom(fiber)
+  }
+
+  // // 真实的 dom 操作
+  // if (fiber.parent) {
+  //   fiber.parent.dom.appendChild(fiber.dom)
+  // }
+  
+  // ...
+}
+// ...
+```
