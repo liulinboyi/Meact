@@ -47,12 +47,14 @@ function createDom(vdom) {
 
 function render(vdom, container) {
 
-  nextUnitOfWork = {
+  wipRoot = {
     dom: container,
     props: {
       children: [vdom],
     }
   }
+
+  nextUnitOfWork = wipRoot
   // container.innerHTML = `<pre>${JSON.stringify(vdom, null, 2)}</pre>`
   // 递归渲染的子元素
   // vdom.props.children.forEach(child => render(child, dom))
@@ -60,9 +62,25 @@ function render(vdom, container) {
   // container.appendChild(dom)
 }
 
+function commitRoot() {
+  commitWorker(wipRoot.child)
+  wipRoot = null
+}
+
+function commitWorker(fiber) {
+  if (!fiber) {
+    return
+  }
+  const domParent = fiber.parent.dom
+  domParent.appendChild(fiber.dom)
+  commitWorker(fiber.child)
+  commitWorker(fiber.slibing)
+}
+
 // 下一个单元任务
 // render 函数会初始化第一个任务
 let nextUnitOfWork = null
+let wipRoot = null
 
 //  调度我们的 diff 或者渲染任务
 function workLoop(deadline) {
@@ -70,6 +88,10 @@ function workLoop(deadline) {
   while (nextUnitOfWork && deadline.timeRemaining() > 1) {
     // 
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork)
+  }
+  if (!nextUnitOfWork && wipRoot) {
+    // 没有任务了，并且根节点还在
+    commitRoot()
   }
   requestIdleCallback(workLoop)
 }
@@ -83,9 +105,11 @@ function performUnitOfWork(fiber) {
     fiber.dom = createDom(fiber)
   }
 
-  if (fiber.parent) {
-    fiber.parent.dom.appendChild(fiber.dom)
-  }
+  // // 真实的 dom 操作
+  // if (fiber.parent) {
+  //   fiber.parent.dom.appendChild(fiber.dom)
+  // }
+
   const elements = fiber.props.children
   // 构建成 fiber
   let index = 0
