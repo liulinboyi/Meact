@@ -107,18 +107,32 @@ function commitWorker(fiber) {
   if (!fiber) {
     return
   }
-  const domParent = fiber.parent.dom
+  // const domParent = fiber.parent.dom
   // domParent.appendChild(fiber.dom)
+  let domParentFiber = fiber.parent
+  while (!domParentFiber.dom) {
+    domParentFiber = domParentFiber.parent
+  }
+  const domParent = domParentFiber.dom
   if (fiber.effectTag === 'PLACEMENT' && fiber.dom !== null) {
     domParent.appendChild(fiber.dom)
   } else if (fiber.effectTag === 'DELETION') {
-    domParent.removeChild(fiber.dom)
+    commitDeletion(fiber, domParent)
+    // domParent.removeChild(fiber.dom)
   } else if (fiber.effectTag === 'UPDATE' && fiber.dom !== null) {
     // 更新dom
     updateDom(fiber.dom, fiber.base.props, fiber.props)
   }
   commitWorker(fiber.child)
   commitWorker(fiber.sibling)
+}
+
+function commitDeletion(fiber, domParent) {
+  if (fiber.dom) {
+    domParent.removeChild(fiber.dom)
+  } else {
+    commitDeletion(fiber.child, domParent)
+  }
 }
 
 // 下一个单元任务
@@ -143,6 +157,36 @@ function workLoop(deadline) {
 }
 
 function performUnitOfWork(fiber) {
+  const isFunctionComponent = fiber.type instanceof Function
+  console.log('iisFunctionComponents', isFunctionComponent, fiber.type, fiber)
+  if (isFunctionComponent) {
+    updateFunctionComponent(fiber)
+  } else {
+    // dom
+    updateHostComponent(fiber)
+  }
+  // 找下一个任务
+  // 先找子元素
+  if (fiber.child) {
+    return fiber.child
+  }
+  let nextFiber = fiber
+  // 没有子元素，就找兄弟元素
+  while (nextFiber) {
+    if (nextFiber.sibling) {
+      return nextFiber.sibling
+    }
+    // 没有兄弟元素，找父元素
+    nextFiber = nextFiber.parent
+  }
+}
+
+function updateFunctionComponent(fiber) {
+  const children = [fiber.type(fiber.props)]
+  reconcileChildren(fiber, children)
+}
+
+function updateHostComponent(fiber) {
   // 获取下一个任务
   // 根据当前任务获取下一个任务
   if (!fiber.dom) {
@@ -158,21 +202,7 @@ function performUnitOfWork(fiber) {
   const elements = fiber.props.children
 
   reconcileChildren(fiber, elements)
-  // 找下一个任务
-  // 先找子元素
-  if (fiber.child) {
-    return fiber.child
-  }
 
-  let nextFiber = fiber
-  // 没有子元素，就找兄弟元素
-  while (nextFiber) {
-    if (nextFiber.sibling) {
-      return nextFiber.sibling
-    }
-    // 没有兄弟元素，找父元素
-    nextFiber = nextFiber.parent
-  }
 }
 
 function reconcileChildren(wipFiber, elements) {
