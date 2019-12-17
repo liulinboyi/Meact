@@ -181,7 +181,37 @@ function performUnitOfWork(fiber) {
   }
 }
 
+let wipFiber = null
+let hookIndex = null
+function useState(init) {
+  const oldHook = wipFiber.base && wipFiber.base.hooks[hookIndex]
+  const hook = {
+    state: oldHook ? oldHook.state : init,
+    queue: []
+  }
+  const actions = oldHook ? oldHook.queue : []
+  actions.forEach(action => {
+    hook.state = action
+  })
+  const setState = action => {
+    hook.queue.push(action)
+    wipRoot = {
+      dom: currentRoot.dom,
+      props: currentRoot.props,
+      base: currentRoot,
+    }
+    nextUnitOfWork = wipRoot
+    deletions = []
+  }
+  wipFiber.hooks.push(hook)
+  hookIndex++
+  return [hook.state, setState]
+}
+
 function updateFunctionComponent(fiber) {
+  wipFiber = fiber
+  hookIndex = 0
+  wipFiber.hooks = []
   const children = [fiber.type(fiber.props)]
   reconcileChildren(fiber, children)
 }
@@ -268,4 +298,5 @@ requestIdleCallback(workLoop)
 export default {
   createElement,
   render,
+  useState,
 }
