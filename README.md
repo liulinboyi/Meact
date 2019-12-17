@@ -631,3 +631,121 @@ function commitWorker(fiber) {
 // ...
 ```
 
+### 函数式组件
+
+为了让我们方便测试函数式组件的实现，我们先把页面代码改造成函数式组件的写法:
+
+```js
+// /src/index.js
+// ...
+function App(props) {
+  return (
+    <div id="app">
+      <h1>hello, {props.title}</h1>
+      <p>react dom</p>
+      <a href="https://jd.com">shop</a>
+    </div>
+  )
+}
+
+let element = <App title="yolkjs" />
+
+ReactDOM.render(element, document.getElementById('root'))
+```
+
+其实函数也是一样的渲染，只不过 type 是函数，而不是字符串，我们需要在处理 vdom 的时候识别其和普通 dom 的区别
+
+1. 根据type 执行不同的函数来初始化 fiber, 
+
+```js
+// /src/yolkjs/index.js
+// ...
+function performUnitOfWork(fiber) {
+  const isFunctionComponent = fiber.type instanceof Function
+  console.log('iisFunctionComponents', isFunctionComponent, fiber.type, fiber)
+  if (isFunctionComponent) {
+    updateFunctionComponent(fiber)
+  } else {
+    // dom
+    updateHostComponent(fiber)
+  }
+  // 找下一个任务
+  // 先找子元素
+  if (fiber.child) {
+    return fiber.child
+  }
+  let nextFiber = fiber
+  // 没有子元素，就找兄弟元素
+  while (nextFiber) {
+    if (nextFiber.sibling) {
+      return nextFiber.sibling
+    }
+    // 没有兄弟元素，找父元素
+    nextFiber = nextFiber.parent
+  }
+}
+
+function updateFunctionComponent(fiber) {
+  const children = [fiber.type(fiber.props)]
+  reconcileChildren(fiber, children)
+}
+
+function updateHostComponent(fiber) {
+  // 获取下一个任务
+  // 根据当前任务获取下一个任务
+  if (!fiber.dom) {
+    // 不是入口
+    fiber.dom = createDom(fiber)
+  }
+
+  // // 真实的 dom 操作
+  // if (fiber.parent) {
+  //   fiber.parent.dom.appendChild(fiber.dom)
+  // }
+
+  const elements = fiber.props.children
+
+  reconcileChildren(fiber, elements)
+
+}
+// ...
+```
+
+2. 函数组件没有 dom 属性（没有 dom 属性，查找 dom 需要向上循环查找）
+
+```js
+// /src/yolkjs/index.js
+// ...
+function commitWorker(fiber) {
+  if (!fiber) {
+    return
+  }
+  // const domParent = fiber.parent.dom
+  // domParent.appendChild(fiber.dom)
+  let domParentFiber = fiber.parent
+  while (!domParentFiber.dom) {
+    domParentFiber = domParentFiber.parent
+  }
+  const domParent = domParentFiber.dom
+  if (fiber.effectTag === 'PLACEMENT' && fiber.dom !== null) {
+    domParent.appendChild(fiber.dom)
+  } else if (fiber.effectTag === 'DELETION') {
+    commitDeletion(fiber, domParent)
+    // domParent.removeChild(fiber.dom)
+  } else if (fiber.effectTag === 'UPDATE' && fiber.dom !== null) {
+    // 更新dom
+    updateDom(fiber.dom, fiber.base.props, fiber.props)
+  }
+  commitWorker(fiber.child)
+  commitWorker(fiber.sibling)
+}
+
+function commitDeletion(fiber, domParent) {
+  if (fiber.dom) {
+    domParent.removeChild(fiber.dom)
+  } else {
+    commitDeletion(fiber.child, domParent)
+  }
+}
+// ...
+```
