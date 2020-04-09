@@ -61,7 +61,7 @@ function updateDom(dom, preProps, nextProps) {
     .forEach(name => {
       if (name.slice(0, 2) === 'on') {
         // onclick => chick
-        dom.removeEventListener(name.slice(0, 2).toLowerCase(), preProps[name], false)
+        dom.removeEventListener(name.slice(2).toLowerCase(), preProps[name], false)
       } else {
         dom[name] = ''
       }
@@ -72,7 +72,7 @@ function updateDom(dom, preProps, nextProps) {
     .forEach(name => {
       if (name.slice(0, 2) === 'on') {
         // onclick => chick
-        dom.removeEventListener(name.slice(0, 2).toLowerCase(), preProps[name], false)
+        dom.addEventListener(name.slice(2).toLowerCase(), preProps[name], false)
       } else {
         dom[name] = nextProps[name]
       }

@@ -19,7 +19,7 @@
 
 ### JSX 
 
-JSX 写起来像 html， 其实是 babel 转义成 `React.crxeateElement` 来执行的，用来构建虚拟 dom,
+JSX 写起来像 html， 其实是 babel 转义成 `React.createElement` 来执行的，用来构建虚拟 dom,
 
 ```js
 <h1 title="app">Yolk test</h1>
@@ -563,7 +563,7 @@ function updateDom(dom, preProps, nextProps) {
     .forEach(name => {
       if (name.slice(0, 2) === 'on') {
         // onclick => chick
-        dom.removeEventListener(name.slice(0, 2).toLowerCase(), preProps[name], false)
+        dom.removeEventListener(name.slice(2).toLowerCase(), preProps[name], false)
       } else {
         dom[name] = ''
       }
@@ -574,7 +574,7 @@ function updateDom(dom, preProps, nextProps) {
     .forEach(name => {
       if (name.slice(0, 2) === 'on') {
         // onclick => chick
-        dom.removeEventListener(name.slice(0, 2).toLowerCase(), preProps[name], false)
+        dom.addEventListener(name.slice(2).toLowerCase(), preProps[name], false)
       } else {
         dom[name] = nextProps[name]
       }
@@ -749,3 +749,8 @@ function commitDeletion(fiber, domParent) {
 }
 // ...
 ```
+
+### Hooks
+
+实际上 hooks 是通过链表来查找具体的 state， 这里我们通过数组来简单模拟一下，把 userState 存储的 hooks, 存储在 fiber 中
+
