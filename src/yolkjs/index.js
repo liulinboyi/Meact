@@ -6,7 +6,10 @@
  * @param  {...any} children 子元素 
  */
 function createElement(type, props, ...children) {
-  delete props.__source
+  // console.warn(children);
+  if (props) {
+    delete props.__source;
+  }
   return {
     type,
     props: {
