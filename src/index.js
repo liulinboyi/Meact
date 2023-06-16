@@ -7,12 +7,32 @@ const ReactDOM = React
 
 function App(props) {
   const [count, setCount] = React.useState(1)
+  const [demo, setDemo] = React.useState('hello')
+  const addTwice = () => {
+    const c1 = Math.random() * 10 + count
+    console.warn("[c1]", c1)
+    setCount(c1)
+    Promise.resolve().then(() => {
+      const c2 = Math.random() * 10 + count
+      console.warn("[c2]", c2)
+      // debugger
+      setCount(c2)
+      setTimeout(() => {
+        const c3 = Math.random() * 10 + count
+        console.warn("[c3]", c3)
+        debugger
+        setCount(c3)
+      }, 5000)
+    })
+  }
   return (
     <div id="app">
       <h1>hello, {props.title}</h1>
       <p>react dom {count}</p>
+      <p>react demo {demo}</p>
       <a href="https://jd.com">shop</a>
-      <button onClick={() => setCount(count + 1)}>add</button>
+      <button onClick={() => addTwice()}>add</button>
+      <button onClick={ () => setDemo(demo + Math.random() * 10) }>change</button>
     </div>
   )
 }

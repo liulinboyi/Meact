@@ -47,6 +47,7 @@ function createDom(vdom) {
 }
 
 function updateDom(dom, preProps, nextProps) {
+  // debugger
   /**
    * 1. 规避 children 属性
    * 2. 老得存在，取消
@@ -55,11 +56,22 @@ function updateDom(dom, preProps, nextProps) {
 
   //  @todo 兼容性问题  
 
+  const filterPreProps = name => {
+    if (name.slice(0, 2) !== 'on') {
+      return false
+    }
+    if (!(name in nextProps)) {
+      return false
+    }
+    return true
+  }
+  
   Object.keys(preProps)
     .filter(name => name !== 'children')
-    .filter(name => !(name in nextProps))
+    .filter(filterPreProps)
     .forEach(name => {
       if (name.slice(0, 2) === 'on') {
+        // debugger
         // onclick => chick
         dom.removeEventListener(name.slice(2).toLowerCase(), preProps[name], false)
       } else {
@@ -71,15 +83,19 @@ function updateDom(dom, preProps, nextProps) {
     .filter(name => name !== 'children')
     .forEach(name => {
       if (name.slice(0, 2) === 'on') {
+        // debugger
         // onclick => chick
-        dom.addEventListener(name.slice(2).toLowerCase(), preProps[name], false)
+        dom.addEventListener(name.slice(2).toLowerCase(), nextProps[name], false)
       } else {
         dom[name] = nextProps[name]
       }
     })
 }
 
+const updateQueue = []
+
 function render(vdom, container) {
+  // debugger
   wipRoot = {
     dom: container,
     props: {
@@ -87,13 +103,37 @@ function render(vdom, container) {
     },
     base: currentRoot, // 分身
   }
+  updateQueue.push(wipRoot)
   deletions = []
-  nextUnitOfWork = wipRoot
+  // nextUnitOfWork = wipRoot
   // container.innerHTML = `<pre>${JSON.stringify(vdom, null, 2)}</pre>`
   // 递归渲染的子元素
   // vdom.props.children.forEach(child => render(child, dom))
 
   // container.appendChild(dom)
+  requestIdleCallback(performWork)
+}
+
+function scheduleWork(wipRoot) {
+  updateQueue.push(wipRoot)
+  deletions = []
+  requestIdleCallback(performWork) //开始干活
+}
+
+// function performWork() {
+//   //  启动空闲时间渲染
+//   requestIdleCallback(workLoop)
+// }
+
+function performWork(deadline) {
+  workLoop(deadline)
+  if (nextUnitOfWork || updateQueue.length > 0) {
+    requestIdleCallback(performWork) //继续干
+  }
+}
+
+function createWorkInProgress(queue) {
+  return queue.shift()
 }
 
 function commitRoot() {
@@ -101,6 +141,7 @@ function commitRoot() {
   commitWorker(wipRoot.child)
   currentRoot = wipRoot
   wipRoot = null
+  nextUnitOfWork = null
 }
 
 function commitWorker(fiber) {
@@ -144,16 +185,21 @@ let deletions = null
 
 //  调度我们的 diff 或者渲染任务
 function workLoop(deadline) {
+  if (!nextUnitOfWork) {
+    //一个周期内只创建一次
+    nextUnitOfWork = createWorkInProgress(updateQueue)
+  }
   // 有下一个任务，且当前帧还没有结束
-  while (nextUnitOfWork && deadline.timeRemaining() > 1) {
+  // while (nextUnitOfWork && deadline.timeRemaining() > 1) {
+  while (nextUnitOfWork) { // 方便调试 去掉判断当前帧是否没有结束
     // 
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork)
   }
-  if (!nextUnitOfWork && wipRoot) {
+  if (!nextUnitOfWork && wipRoot && !updateQueue.length) {
     // 没有任务了，并且根节点还在
     commitRoot()
   }
-  requestIdleCallback(workLoop)
+  // requestIdleCallback(workLoop)
 }
 
 function performUnitOfWork(fiber) {
@@ -184,24 +230,34 @@ function performUnitOfWork(fiber) {
 let wipFiber = null
 let hookIndex = null
 function useState(init) {
+  // debugger
   const oldHook = wipFiber.base && wipFiber.base.hooks[hookIndex]
-  const hook = {
-    state: oldHook ? oldHook.state : init,
-    queue: []
+  let hook
+  if (oldHook) {
+    hook = oldHook
+  } else {
+    hook = {
+      state: oldHook ? oldHook.state : init,
+      queue: []
+    }
   }
   const actions = oldHook ? oldHook.queue : []
   actions.forEach(action => {
     hook.state = action
   })
+  hook.queue.shift()
   const setState = action => {
+    // debugger
+    // hook.queue.length = 0
     hook.queue.push(action)
     wipRoot = {
       dom: currentRoot.dom,
       props: currentRoot.props,
       base: currentRoot,
     }
-    nextUnitOfWork = wipRoot
+    // nextUnitOfWork = wipRoot
     deletions = []
+    scheduleWork(wipRoot)
   }
   wipFiber.hooks.push(hook)
   hookIndex++
@@ -292,8 +348,6 @@ function reconcileChildren(wipFiber, elements) {
   }
 }
 
-//  启动空闲时间渲染
-requestIdleCallback(workLoop)
 
 export default {
   createElement,
