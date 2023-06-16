@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.js": "/static/js/main.3071deb0.chunk.js",
+    "main.js.map": "/static/js/main.3071deb0.chunk.js.map",
+    "runtime-main.js": "/static/js/runtime-main.1db09ff8.js",
+    "runtime-main.js.map": "/static/js/runtime-main.1db09ff8.js.map",
+    "index.html": "/index.html",
+    "precache-manifest.0cc6ba05d5667c4676ae45b5442f1bbf.js": "/precache-manifest.0cc6ba05d5667c4676ae45b5442f1bbf.js",
+    "service-worker.js": "/service-worker.js"
+  },
+  "entrypoints": [
+    "static/js/runtime-main.1db09ff8.js",
+    "static/js/main.3071deb0.chunk.js"
+  ]
+}
