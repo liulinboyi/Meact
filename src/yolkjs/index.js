@@ -139,9 +139,19 @@ function createWorkInProgress(queue) {
   return queue.shift()
 }
 
+function commitEffects (effects) {
+  Object.keys(effects).forEach(key => {
+    let effect = effects[key]
+    effect()
+  })
+}
+
 function commitRoot() {
   deletions.forEach(commitWorker)
   commitWorker(wipRoot.child)
+
+  commitEffects(wipFiber.effects)
+
   currentRoot = wipRoot
   wipRoot = null
   nextUnitOfWork = null
@@ -267,10 +277,53 @@ function useState(init) {
   return [hook.state, setState]
 }
 
+let oldInputs = []
+function processEffect (create, inputs, oldEffect) {
+  return function () {
+    const current = wipFiber
+    if (current) {
+      let hasChanged
+      if (inputs) {
+        if (Array.isArray(inputs)) {
+          if (inputs.length) {
+            hasChanged = oldInputs.some((value, i) => inputs[i] !== value)
+          } else {
+            if (!oldEffect) {
+              hasChanged = true
+            } else {
+              hasChanged = false
+            }
+          }
+        } else {
+          throw new Error("the dep must be a Array")
+        }
+      } else {
+        hasChanged = true
+      }
+      if (hasChanged) {
+        create()
+      }
+      oldInputs = inputs
+    }
+  }
+}
+
+function useEffect(effect, inputs) {
+  const current = wipFiber
+  // const cursor = hookIndex
+  if (current) {
+    let key = '$' + hookIndex
+    const oldEffect = wipFiber.base && wipFiber.base.effects[key]
+    current.effects[key] = processEffect(effect, inputs, oldEffect)
+    hookIndex++
+  }
+}
+
 function updateFunctionComponent(fiber) {
   wipFiber = fiber
   hookIndex = 0
   wipFiber.hooks = []
+  wipFiber.effects = []
   const children = [fiber.type(fiber.props)]
   reconcileChildren(fiber, children)
 }
@@ -356,4 +409,5 @@ export default {
   createElement,
   render,
   useState,
+  useEffect,
 }

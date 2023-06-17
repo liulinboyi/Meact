@@ -8,6 +8,11 @@ const ReactDOM = React
 function App(props) {
   const [count, setCount] = React.useState(1)
   const [demo, setDemo] = React.useState('hello')
+
+  React.useEffect(() => {
+    console.log("[useEffect]", count)
+  }, [])
+
   const addTwice = () => {
     const c1 = Math.random() * 10 + count
     console.warn("[c1]", c1)
@@ -20,9 +25,9 @@ function App(props) {
       setTimeout(() => {
         const c3 = Math.random() * 10 + count
         console.warn("[c3]", c3)
-        debugger
+        // debugger
         setCount(c3)
-      }, 5000)
+      })
     })
   }
   return (
