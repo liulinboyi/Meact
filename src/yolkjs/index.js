@@ -50,7 +50,6 @@ function createDom(vdom) {
 }
 
 function updateDom(dom, preProps, nextProps) {
-  // debugger
   /**
    * 1. 规避 children 属性
    * 2. 老得存在，取消
@@ -74,7 +73,6 @@ function updateDom(dom, preProps, nextProps) {
     .filter(filterPreProps)
     .forEach(name => {
       if (name.slice(0, 2) === 'on') {
-        // debugger
         // onclick => chick
         dom.removeEventListener(name.slice(2).toLowerCase(), preProps[name], false)
       } else {
@@ -86,7 +84,6 @@ function updateDom(dom, preProps, nextProps) {
     .filter(name => name !== 'children')
     .forEach(name => {
       if (name.slice(0, 2) === 'on') {
-        // debugger
         // onclick => chick
         dom.addEventListener(name.slice(2).toLowerCase(), nextProps[name], false)
       } else {
@@ -95,10 +92,45 @@ function updateDom(dom, preProps, nextProps) {
     })
 }
 
+let deadline = 0
+// for test
+// const threshold = 5000000000000
+const threshold = 1
+
+
+const getTime = () => performance.now()
+
+const task = (pending) => {
+  if (!pending && typeof Promise !== 'undefined') {
+    // TODO: queueMicrotask
+    return () => Promise.resolve().then(flush)
+  }
+  if (typeof MessageChannel !== 'undefined') {
+    const { port1, port2 } = new MessageChannel()
+    //  启动空闲时间渲染
+    port1.onmessage = flush
+    return () => port2.postMessage(null)
+  }
+  return () => setTimeout(flush)
+}
+
+let postTask = task(false)
+
+const shouldYield = () => {
+  const pending = getTime() >= deadline
+  postTask = task(pending)
+  return pending
+}
+
+const flush = () => {
+  // let task, next
+  deadline = getTime() + threshold // TODO: heuristic algorithm
+  performWork()
+}
+
 const updateQueue = []
 
 function render(vdom, container) {
-  // debugger
   wipRoot = {
     dom: container,
     props: {
@@ -108,30 +140,20 @@ function render(vdom, container) {
   }
   updateQueue.push(wipRoot)
   deletions = []
-  // nextUnitOfWork = wipRoot
-  // container.innerHTML = `<pre>${JSON.stringify(vdom, null, 2)}</pre>`
-  // 递归渲染的子元素
-  // vdom.props.children.forEach(child => render(child, dom))
 
-  // container.appendChild(dom)
-  requestIdleCallback(performWork)
+  postTask()
 }
 
 function scheduleWork(wipRoot) {
   updateQueue.push(wipRoot)
   deletions = []
-  requestIdleCallback(performWork) //开始干活
+  postTask() //开始干活
 }
-
-// function performWork() {
-//   //  启动空闲时间渲染
-//   requestIdleCallback(workLoop)
-// }
 
 function performWork(deadline) {
   workLoop(deadline)
   if (nextUnitOfWork || updateQueue.length > 0) {
-    requestIdleCallback(performWork) //继续干
+    postTask() //继续干
   }
 }
 
@@ -152,9 +174,11 @@ function commitRoot() {
 
   commitEffects(wipFiber.effects)
 
+  wipFiber.effects = []
   currentRoot = wipRoot
   wipRoot = null
   nextUnitOfWork = null
+  effectIndex = 0
 }
 
 function commitWorker(fiber) {
@@ -203,21 +227,18 @@ function workLoop(deadline) {
     nextUnitOfWork = createWorkInProgress(updateQueue)
   }
   // 有下一个任务，且当前帧还没有结束
-  // while (nextUnitOfWork && deadline.timeRemaining() > 1) {
-  while (nextUnitOfWork) { // 方便调试 去掉判断当前帧是否没有结束
-    // 
+  while (nextUnitOfWork && !shouldYield()) { // 方便调试 去掉判断当前帧是否没有结束
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork)
   }
   if (!nextUnitOfWork && wipRoot && !updateQueue.length) {
     // 没有任务了，并且根节点还在
     commitRoot()
   }
-  // requestIdleCallback(workLoop)
 }
 
 function performUnitOfWork(fiber) {
   const isFunctionComponent = fiber.type instanceof Function
-  console.log('iisFunctionComponents', isFunctionComponent, fiber.type, fiber)
+  // console.log('iisFunctionComponents', isFunctionComponent, fiber.type, fiber)
   if (isFunctionComponent) {
     updateFunctionComponent(fiber)
   } else {
@@ -242,8 +263,8 @@ function performUnitOfWork(fiber) {
 
 let wipFiber = null
 let hookIndex = null
+let effectIndex = 0
 function useState(init) {
-  // debugger
   const oldHook = wipFiber.base && wipFiber.base.hooks[hookIndex]
   let hook
   if (oldHook) {
@@ -260,7 +281,6 @@ function useState(init) {
   })
   hook.queue.shift()
   const setState = action => {
-    // debugger
     // hook.queue.length = 0
     hook.queue.push(action)
     wipRoot = {
@@ -278,7 +298,7 @@ function useState(init) {
 }
 
 let oldInputs = []
-function processEffect (create, inputs, oldEffect) {
+function processEffect (create, inputs, oldFiber) {
   return function () {
     const current = wipFiber
     if (current) {
@@ -287,12 +307,9 @@ function processEffect (create, inputs, oldEffect) {
         if (Array.isArray(inputs)) {
           if (inputs.length) {
             hasChanged = oldInputs.some((value, i) => inputs[i] !== value)
-          } else {
-            if (!oldEffect) {
-              hasChanged = true
-            } else {
-              hasChanged = false
-            }
+          }
+          if (!oldFiber) {
+            hasChanged = true
           }
         } else {
           throw new Error("the dep must be a Array")
@@ -312,10 +329,10 @@ function useEffect(effect, inputs) {
   const current = wipFiber
   // const cursor = hookIndex
   if (current) {
-    let key = '$' + hookIndex
-    const oldEffect = wipFiber.base && wipFiber.base.effects[key]
-    current.effects[key] = processEffect(effect, inputs, oldEffect)
-    hookIndex++
+    let key = '$' + effectIndex
+    const oldFiber = wipFiber.base
+    current.effects[key] = processEffect(effect, inputs, oldFiber)
+    effectIndex++
   }
 }
 
@@ -323,7 +340,7 @@ function updateFunctionComponent(fiber) {
   wipFiber = fiber
   hookIndex = 0
   wipFiber.hooks = []
-  wipFiber.effects = []
+  wipFiber.effects = wipFiber.base ? wipFiber.base.effects : []
   const children = [fiber.type(fiber.props)]
   reconcileChildren(fiber, children)
 }

@@ -7,11 +7,12 @@ const ReactDOM = React
 
 function App(props) {
   const [count, setCount] = React.useState(1)
+  console.warn("[count]", count)
   const [demo, setDemo] = React.useState('hello')
 
   React.useEffect(() => {
     console.log("[useEffect]", count)
-  }, [])
+  }, [count])
 
   const addTwice = () => {
     const c1 = Math.random() * 10 + count
