@@ -12,6 +12,7 @@ function App(props) {
 
   React.useEffect(() => {
     console.log("[useEffect]", count)
+    console.log(document.querySelector(".count-dom").innerHTML)
   }, [count])
 
   const addTwice = () => {
@@ -34,7 +35,7 @@ function App(props) {
   return (
     <div id="app">
       <h1>hello, {props.title}</h1>
-      <p>react dom {count}</p>
+      <p className='count-dom'>react dom {count}</p>
       <p>react demo {demo}</p>
       <a href="https://jd.com">shop</a>
       <button onClick={() => addTwice()}>add</button>
