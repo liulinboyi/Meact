@@ -94,11 +94,43 @@ function updateDom(dom, preProps, nextProps) {
 
 let deadline = 0
 // for test
-// const threshold = 5000000000000
-const threshold = 1
+const threshold = 5
+// const threshold = 1
+const queue = []
 
 
 const getTime = () => performance.now()
+
+const schedule = (task) => {
+  // debugger
+  queue.push(task) && postTask()
+}
+
+const reconcile = (WIP) => {
+  // debugger
+  // workLoop(WIP)
+  // nextUnitOfWork = WIP
+  // 有下一个任务，且当前帧还没有结束
+  while (WIP) { // 方便调试 去掉判断当前帧是否没有结束
+    WIP = performUnitOfWork(WIP)
+  }
+  if (WIP) return reconcile.bind(null, WIP)
+  if (!WIP && wipRoot) {
+    // 没有任务了，并且根节点还在
+    commitRoot()
+  }
+}
+
+const update = (fiber) => {
+  if (fiber) {
+    // fiber.lane = LANE.UPDATE | LANE.DIRTY
+    schedule(() => {
+      wipFiber = fiber
+      return reconcile(fiber)
+    })
+  }
+}
+
 
 const task = (pending) => {
   if (!pending && typeof Promise !== 'undefined') {
@@ -123,12 +155,15 @@ const shouldYield = () => {
 }
 
 const flush = () => {
-  // let task, next
+  let task, next
   deadline = getTime() + threshold // TODO: heuristic algorithm
-  performWork()
+  // task 执行可以返回下一个 loop
+  while ((task = queue.pop()) && !shouldYield()) {
+    ;(next = task()) && queue.push(next) && schedule(next)
+  }
 }
 
-const updateQueue = []
+// const updateQueue = []
 
 function render(vdom, container) {
   wipRoot = {
@@ -138,28 +173,27 @@ function render(vdom, container) {
     },
     base: currentRoot, // 分身
   }
-  updateQueue.push(wipRoot)
   deletions = []
 
-  postTask()
+  update(wipRoot)
 }
 
 function scheduleWork(wipRoot) {
-  updateQueue.push(wipRoot)
   deletions = []
-  postTask() //开始干活
+  // postTask() //开始干活
+  update(wipRoot)
 }
 
-function performWork(deadline) {
-  workLoop(deadline)
-  if (nextUnitOfWork || updateQueue.length > 0) {
-    postTask() //继续干
-  }
-}
+// function performWork(deadline) {
+//   workLoop(deadline)
+//   if (nextUnitOfWork || updateQueue.length > 0) {
+//     postTask() //继续干
+//   }
+// }
 
-function createWorkInProgress(queue) {
-  return queue.shift()
-}
+// function createWorkInProgress(queue) {
+//   return queue.shift()
+// }
 
 function commitEffects (effects) {
   Object.keys(effects).forEach(key => {
@@ -177,7 +211,7 @@ function commitRoot() {
   wipFiber.effects = []
   currentRoot = wipRoot
   wipRoot = null
-  nextUnitOfWork = null
+  // nextUnitOfWork = null
   effectIndex = 0
 }
 
@@ -215,26 +249,10 @@ function commitDeletion(fiber, domParent) {
 
 // 下一个单元任务
 // render 函数会初始化第一个任务
-let nextUnitOfWork = null
+// let nextUnitOfWork = null
 let wipRoot = null
 let currentRoot = null
 let deletions = null
-
-//  调度我们的 diff 或者渲染任务
-function workLoop(deadline) {
-  if (!nextUnitOfWork) {
-    //一个周期内只创建一次
-    nextUnitOfWork = createWorkInProgress(updateQueue)
-  }
-  // 有下一个任务，且当前帧还没有结束
-  while (nextUnitOfWork && !shouldYield()) { // 方便调试 去掉判断当前帧是否没有结束
-    nextUnitOfWork = performUnitOfWork(nextUnitOfWork)
-  }
-  if (!nextUnitOfWork && wipRoot && !updateQueue.length) {
-    // 没有任务了，并且根节点还在
-    commitRoot()
-  }
-}
 
 function performUnitOfWork(fiber) {
   const isFunctionComponent = fiber.type instanceof Function
@@ -288,7 +306,6 @@ function useState(init) {
       props: currentRoot.props,
       base: currentRoot,
     }
-    // nextUnitOfWork = wipRoot
     deletions = []
     scheduleWork(wipRoot)
   }
@@ -369,9 +386,17 @@ function reconcileChildren(wipFiber, elements) {
   let index = 0
   let oldFiber = wipFiber.base && wipFiber.base.child
   let preSibling = null
-  while (index < elements.length) {
+  const allElement = []
+  for (let n of elements) {
+    if (Array.isArray(n)) {
+      allElement.push(...n)
+    } else {
+      allElement.push(n)
+    }
+  }
+  while (index < allElement.length) {
     // while (index < elements.length) {
-    let element = elements[index]
+    let element = allElement[index]
     let newFiber = null
     // 对比 oldfiber 的状态和当前 element
     // 先比较类型，
@@ -427,4 +452,5 @@ export default {
   render,
   useState,
   useEffect,
+  startTranstion: schedule,
 }
