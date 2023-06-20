@@ -107,7 +107,8 @@ const schedule = (task) => {
 }
 
 const reconcile = (WIP) => {
-  // debugger
+  debugger
+  const wipRoot = WIP
   // workLoop(WIP)
   // nextUnitOfWork = WIP
   // 有下一个任务，且当前帧还没有结束
@@ -117,9 +118,9 @@ const reconcile = (WIP) => {
   debugger
   // TODO
   // if (WIP) return reconcile.bind(null, WIP)
-  if (!WIP && wipRoot) {
+  if (!WIP) {
     // 没有任务了，并且根节点还在
-    commitRoot()
+    commitRoot(wipRoot)
   }
 }
 
@@ -157,21 +158,16 @@ const shouldYield = () => {
 }
 
 function peek(heap) {
-  return heap.length === 0 ? null : heap[0];
+  return heap.length === 0 ? null : heap[heap.length - 1];
 }
 
 const flush = () => {
   debugger
-  // let task, next
   let task
   deadline = getTime() + threshold // TODO: heuristic algorithm
   // task 执行可以返回下一个 loop
   while ((task = peek(queue)) && !shouldYield()) {
     task()
-    // if (next) {
-    //   queue.push(next)
-    //   schedule(next)
-    // }
     queue.pop()
   }
   if (task) {
@@ -179,10 +175,8 @@ const flush = () => {
   }
 }
 
-// const updateQueue = []
-
 function render(vdom, container) {
-  wipRoot = {
+  let wipRoot = {
     dom: container,
     props: {
       children: [vdom],
@@ -200,17 +194,6 @@ function scheduleWork(wipRoot) {
   update(wipRoot)
 }
 
-// function performWork(deadline) {
-//   workLoop(deadline)
-//   if (nextUnitOfWork || updateQueue.length > 0) {
-//     postTask() //继续干
-//   }
-// }
-
-// function createWorkInProgress(queue) {
-//   return queue.shift()
-// }
-
 function commitEffects (effects) {
   Object.keys(effects).forEach(key => {
     let effect = effects[key]
@@ -218,7 +201,7 @@ function commitEffects (effects) {
   })
 }
 
-function commitRoot() {
+function commitRoot(wipRoot) {
   deletions.forEach(commitWorker)
   commitWorker(wipRoot.child)
 
@@ -226,8 +209,6 @@ function commitRoot() {
 
   wipFiber.effects = []
   currentRoot = wipRoot
-  wipRoot = null
-  // nextUnitOfWork = null
   effectIndex = 0
 }
 
@@ -266,7 +247,6 @@ function commitDeletion(fiber, domParent) {
 // 下一个单元任务
 // render 函数会初始化第一个任务
 // let nextUnitOfWork = null
-let wipRoot = null
 let currentRoot = null
 let deletions = null
 
@@ -317,7 +297,7 @@ function useState(init) {
   const setState = action => {
     // hook.queue.length = 0
     hook.queue.push(action)
-    wipRoot = {
+    let wipRoot = {
       dom: currentRoot.dom,
       props: currentRoot.props,
       base: currentRoot,

@@ -53,15 +53,15 @@ function many() {
 let index = 0
 
 export function App(props) {
-    if (index !== 0) {
-        many()
-    }
     index++
     const [count, setCount] = React.useState(1)
     console.warn("[count]", count)
     const [demo, setDemo] = React.useState('hello')
 
     React.useEffect(() => {
+        if (index !== 0) {
+            many()
+        }
         console.log("[useEffect]", count)
         console.log(document.querySelector(".count-dom").innerHTML)
     }, [count])
