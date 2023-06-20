@@ -102,7 +102,7 @@ const queue = []
 const getTime = () => performance.now()
 
 const schedule = (task) => {
-  // debugger
+  debugger
   queue.push(task) && postTask()
 }
 
@@ -114,7 +114,9 @@ const reconcile = (WIP) => {
   while (WIP) { // 方便调试 去掉判断当前帧是否没有结束
     WIP = performUnitOfWork(WIP)
   }
-  if (WIP) return reconcile.bind(null, WIP)
+  debugger
+  // TODO
+  // if (WIP) return reconcile.bind(null, WIP)
   if (!WIP && wipRoot) {
     // 没有任务了，并且根节点还在
     commitRoot()
@@ -154,12 +156,26 @@ const shouldYield = () => {
   return pending
 }
 
+function peek(heap) {
+  return heap.length === 0 ? null : heap[0];
+}
+
 const flush = () => {
-  let task, next
+  debugger
+  // let task, next
+  let task
   deadline = getTime() + threshold // TODO: heuristic algorithm
   // task 执行可以返回下一个 loop
-  while ((task = queue.pop()) && !shouldYield()) {
-    ;(next = task()) && queue.push(next) && schedule(next)
+  while ((task = peek(queue)) && !shouldYield()) {
+    task()
+    // if (next) {
+    //   queue.push(next)
+    //   schedule(next)
+    // }
+    queue.pop()
+  }
+  if (task) {
+    postTask()
   }
 }
 
