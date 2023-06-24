@@ -3,7 +3,8 @@
 
 import React from './yolkjs'
 // import { App } from './ConcurrentMode'
-import { App } from './demo'
+// import { App } from './demo'
+import { App } from './demo1'
 
 const ReactDOM = React
 

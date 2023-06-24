@@ -1,3 +1,7 @@
+// 没有lean 无法实现并发更新
+// 现在这版实现的是完全的微任务更新
+// Legacy 模式。如果是在 event、setTimeout、network request 的 callback 中触发更新，那么协调时会启动 workLoopSync。
+// workLoopSync 开始工作以后，要等到 stack 中收集的所有 fiber node 都处理完毕以后，才会结束工作，也就是 fiber tree 的协调过程不可中断。
 
 /**
  * 创建虚拟dom的方法
@@ -74,7 +78,10 @@ function updateDom(dom, preProps, nextProps) {
     .forEach(name => {
       if (name.slice(0, 2) === 'on') {
         // onclick => chick
-        dom.removeEventListener(name.slice(2).toLowerCase(), preProps[name], false)
+        const eventName = `${name.slice(2).toLowerCase()}__invoker`
+        if (dom[eventName]) {
+          dom.removeEventListener(name.slice(2).toLowerCase(), dom[eventName], false)
+        }
       } else {
         dom[name] = ''
       }
@@ -85,25 +92,39 @@ function updateDom(dom, preProps, nextProps) {
     .forEach(name => {
       if (name.slice(0, 2) === 'on') {
         // onclick => chick
-        dom.addEventListener(name.slice(2).toLowerCase(), nextProps[name], false)
+        const eventName = `${name.slice(2).toLowerCase()}__invoker`
+        dom[eventName] = () => {
+          nextProps[name]()
+        }
+        dom.addEventListener(name.slice(2).toLowerCase(), dom[eventName], false)
       } else {
         dom[name] = nextProps[name]
       }
     })
 }
 
-let deadline = 0
-// for test
-const threshold = 5
-// const threshold = 1
 const queue = []
-
-
-const getTime = () => performance.now()
 
 const schedule = (task) => {
   debugger
-  queue.push(task) && postTask()
+  queue.push(task)
+  flush()
+}
+
+function flush() {
+  queueMicrotask(wookLoopSync)
+}
+
+function wookLoopSync() {
+  performWork()
+}
+
+function performWork() {
+  let task;
+  // task 执行可以返回下一个 loop
+  while ((task = queue.pop())) {
+    task();
+  }
 }
 
 const reconcile = (WIP) => {
@@ -131,47 +152,6 @@ const update = (fiber) => {
       wipFiber = fiber
       return reconcile(fiber)
     })
-  }
-}
-
-
-const task = (pending) => {
-  if (!pending && typeof Promise !== 'undefined') {
-    // TODO: queueMicrotask
-    return () => Promise.resolve().then(flush)
-  }
-  if (typeof MessageChannel !== 'undefined') {
-    const { port1, port2 } = new MessageChannel()
-    //  启动空闲时间渲染
-    port1.onmessage = flush
-    return () => port2.postMessage(null)
-  }
-  return () => setTimeout(flush)
-}
-
-let postTask = task(false)
-
-const shouldYield = () => {
-  const pending = getTime() >= deadline
-  postTask = task(pending)
-  return pending
-}
-
-function peek(heap) {
-  return heap.length === 0 ? null : heap[heap.length - 1];
-}
-
-const flush = () => {
-  debugger
-  let task
-  deadline = getTime() + threshold // TODO: heuristic algorithm
-  // task 执行可以返回下一个 loop
-  while ((task = peek(queue)) && !shouldYield()) {
-    task()
-    queue.pop()
-  }
-  if (task) {
-    postTask()
   }
 }
 
