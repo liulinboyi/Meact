@@ -9,6 +9,6 @@ import { App } from './demo1'
 
 const ReactDOM = React
 
-let element = <App title="yolkjs" />
+let element = <App title="Meact" />
 
 ReactDOM.render(element, document.getElementById('root'))
