@@ -1,4 +1,4 @@
-import React from './yolkjs'
+import React from './Meact'
 
 export function App() {
   const [value, setValue] = React.useState("");
