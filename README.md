@@ -1,18 +1,18 @@
 # Meact
 
-一个学习 React18 源码的例子，真实React源码比这个复杂很多
+An example of learning React18 source code, the real React source code is much more complex than this
 
-目前仅实现了的优先级：
+Priorities currently implemented only：
 
-- [x] `SyncLane`: 同步优先级，基于微任务的调度
+- [x] `SyncLane`: Synchronized priority, micro-task based scheduling
 
-- [ ] 其他优先级: 基于宏任务的调度并发更新 TODO 未实现
+- [ ] Other priority: macro task based scheduling concurrent updates TODO not implemented
 
 # Demo
 
 https://blog.heyliubo.top/Meact/build/
 
-# 参考
+# Reference
 
 - [BetaSu/big-react](https://github.com/BetaSu/big-react)
 
