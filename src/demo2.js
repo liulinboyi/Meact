@@ -7,7 +7,6 @@ function Demo(props) {
         <h1>hello, {props.title}</h1>
         <p className="count-dom">react dom {props.count}</p>
         <p>react demo {props.demo}</p>
-        <a href="https://jd.com">shop</a>
       </span>
     );
 }

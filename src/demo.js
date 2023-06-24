@@ -88,7 +88,6 @@ export function App(props) {
             <h1>hello, {props.title}</h1>
             <p className='count-dom'>react dom {count}</p>
             <p>react demo {demo}</p>
-            <a href="https://jd.com">shop</a>
             <button onClick={() => addTwice()}>add</button>
             <button onClick={() => setDemo(demo + Math.random() * 10)}>change</button>
         </div>
