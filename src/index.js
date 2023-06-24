@@ -2,6 +2,7 @@
 // import ReactDOM from 'react-dom'
 
 import React from './Meact'
+import './index.css'
 // import { App } from './ConcurrentMode'
 // import { App } from './demo'
 import { App } from './demo1'

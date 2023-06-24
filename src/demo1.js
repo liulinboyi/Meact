@@ -24,7 +24,7 @@ export function App(props) {
         debugger;console.log(demo);setDemo(demo + Math.random() * 10)
     }
     return (
-        <div id="app">
+        <div id="app" className="wrapper">
             <h1>hello, {props.title}</h1>
             <p className='count-dom'>react dom {count}</p>
             <p>react demo {demo}</p>
