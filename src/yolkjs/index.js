@@ -3,6 +3,29 @@
 // Legacy 模式。如果是在 event、setTimeout、network request 的 callback 中触发更新，那么协调时会启动 workLoopSync。
 // workLoopSync 开始工作以后，要等到 stack 中收集的所有 fiber node 都处理完毕以后，才会结束工作，也就是 fiber tree 的协调过程不可中断。
 
+// lane是优先级的 概念
+// 数字越小，优先级越高
+const SyncLane = 0b000001
+// 没有优先级
+const NoLane =   0b000000
+
+// lanes代表不同lane的集合
+function mergeLanes(laneA, LaneB) {
+  return laneA | LaneB // 按位或
+}
+
+function requestUpdateLane() {
+  return SyncLane
+}
+
+function getHighestPriorityLane(lane) {
+  return lane & -lane
+}
+
+function markRootFinish(root, lane) {
+  root.pendingLanes &= ~lane
+}
+
 /**
  * 创建虚拟dom的方法
  * @param {string} type 元素类型
@@ -104,58 +127,89 @@ function updateDom(dom, preProps, nextProps) {
 }
 
 const queue = []
+let FiberRootNode = null
+let wipRootRenderLane = NoLane // 本地更新的Lane
 
-const schedule = (task) => {
-  debugger
-  queue.push(task)
-  flush()
-}
-
-function flush() {
-  queueMicrotask(wookLoopSync)
-}
-
-function wookLoopSync() {
-  performWork()
-}
-
-function performWork() {
-  let task;
-  // task 执行可以返回下一个 loop
-  while ((task = queue.pop())) {
-    task();
-  }
-}
-
-const reconcile = (WIP) => {
-  debugger
-  const wipRoot = WIP
-  // workLoop(WIP)
-  // nextUnitOfWork = WIP
+const wookLoop = (WIP, updateLane) => {
   // 有下一个任务，且当前帧还没有结束
   while (WIP) { // 方便调试 去掉判断当前帧是否没有结束
     WIP = performUnitOfWork(WIP)
   }
-  debugger
-  // TODO
-  // if (WIP) return reconcile.bind(null, WIP)
-  if (!WIP) {
-    // 没有任务了，并且根节点还在
-    commitRoot(wipRoot)
+}
+
+let flushSync = false
+const update = (fiber) => {
+  if (fiber) {
+    const lane = requestUpdateLane()
+
+    const performSyncOnRoot = (fiber, updateLane) => {
+      const nextLane = getHighestPriorityLane(FiberRootNode.pendingLanes)
+      if (nextLane !== SyncLane) {
+        // 其他比SyncLane低的优先级 
+        // NoLane
+        return
+      }
+      wipRootRenderLane = updateLane
+      wipFiber = fiber
+      try {
+        wookLoop(fiber, updateLane)
+      } catch (error) {
+        console.warn(error)
+      }
+      // 更完成之后重置
+      wipRootRenderLane = NoLane
+      FiberRootNode.finishLane = updateLane // 本次更新的Lane
+      commitRoot(fiber)
+    }
+
+    performSyncOnRoot.lane = lane
+    FiberRootNode.pendingLanes = mergeLanes(FiberRootNode.pendingLanes, lane)
+    // fiber.lane = LANE.UPDATE | LANE.DIRTY
+    // scheduleSyncCallBack(performSyncOnRoot)
+    ensureRootIsSchedules(fiber, performSyncOnRoot)
   }
 }
 
-const update = (fiber) => {
-  if (fiber) {
-    // fiber.lane = LANE.UPDATE | LANE.DIRTY
-    schedule(() => {
-      wipFiber = fiber
-      return reconcile(fiber)
-    })
+const scheduleSyncCallBack = (task) => {
+  queue.push(task)
+}
+
+function flushSyncCallBack() {
+  if (!flushSync && queue.length) {
+    flushSync = true
+    try {
+      queue.forEach(callback => callback())
+    } catch (error) {
+      console.warn(error)
+    } finally {
+      queue.length = 0
+      flushSync = false
+    }
+  }
+}
+
+function ensureRootIsSchedules(fiber, performSyncOnRoot) {
+  const updateLane = getHighestPriorityLane(FiberRootNode.pendingLanes)
+  if (updateLane === NoLane) { // 没有lane 则是没有update 没有更新
+    return
+  }
+  if (updateLane === SyncLane) {
+    // 同步优先级 微任务调度
+    scheduleSyncCallBack(performSyncOnRoot.bind(null, fiber, updateLane))
+    queueMicrotask(flushSyncCallBack)
+  } else {
+    // 其他优先级 宏任务调度
   }
 }
 
 function render(vdom, container) {
+  if (!FiberRootNode) {
+    FiberRootNode = {
+      current: null,
+      pendingLanes: NoLane, // 所有没有被消费的Lane的集合
+      finishLane: NoLane, // 本次更新消费的Lane
+    }
+  }
   let wipRoot = {
     dom: container,
     props: {
@@ -163,6 +217,7 @@ function render(vdom, container) {
     },
     base: currentRoot, // 分身
   }
+  FiberRootNode.current = wipRoot
   deletions = []
 
   update(wipRoot)
@@ -187,6 +242,9 @@ function commitRoot(wipRoot) {
 
   commitEffects(wipFiber.effects)
 
+  markRootFinish(FiberRootNode, FiberRootNode.finishLane)
+
+  FiberRootNode.finishLane = NoLane
   wipFiber.effects = []
   currentRoot = wipRoot
   effectIndex = 0
@@ -282,6 +340,9 @@ function useState(init) {
       props: currentRoot.props,
       base: currentRoot,
     }
+    FiberRootNode.current = wipRoot
+    FiberRootNode.pendingLanes = NoLane // 所有没有被消费的Lane的集合
+    FiberRootNode.finishLane = NoLane // 本次更新消费的Lane
     deletions = []
     scheduleWork(wipRoot)
   }
@@ -428,5 +489,5 @@ export default {
   render,
   useState,
   useEffect,
-  startTranstion: schedule,
+  // startTranstion: schedule,
 }
